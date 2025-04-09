@@ -30,9 +30,11 @@ ex:
 
     Dans investissement prevoir le coût: panneau(x), micro-onduleur(s),routeur solaire , fixation, cable..etc
 
-    conso_maison_W  est la conso "bruit de fond" de la maison à couvrir .
-    angle est l'orientation de pose du panneau (90 est vertical), 'aspect' (mal nommé)  est l'azimute (0= sud;  -15:15 degree vers l'est,  90:plein ouest) 
-    MaxPower est la puissance crête du panneau . libellé nom du fichiers.
+   - 'conso_maison_W'  est la conso "bruit de fond" de la maison à couvrir .
+   - 'angle' est l'orientation de pose du panneau (90 est vertical),
+   - 'aspect' (mal nommé)  est l'azimute (0= sud;  -15:15 degree vers l'est,  90:plein ouest) 
+   - 'MaxPower' est la puissance crête du panneau .
+   - 'libellé' prefix du nom du fichier intermedaire.
 
 * le calcul genere des fichiers excel avec les données journalieres pour chaque panneau et un cumul globlal de tous les panneaux ( plus un graphique journalier pour chaque mois).
 * un fichier resultats_scenarios.xlsx est generé avec le resumé des calculs et ammortissements avec un lien vers chaque fichier excel des données+graphiques.
