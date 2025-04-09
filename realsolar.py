@@ -12,16 +12,44 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Variables globales
 resultats = []
-lat, lon = 48.874, 2.295  #arc de triomphe
+lat, lon = 45.762, 4.698
 startyear, endyear = 2020, 2023
 
 prix_kw = 0.2016  # €/kWh
 date_departcumul = pd.Timestamp("2020-01-01")
 conso_chauffeau_journalière = 2.2  # kWh
 
+#attention si les data de l'horizon change il faut efface les fichiers intermediare data_xxx  pour refaire la demande a pvgis
+## un profile par lieu de panneau ( hauteur des masques de 0 (nord) a 360 degree ) 
+datahorizonType=[
+    "" ,
+ "4.7266,4.7253,4.7241,4.7228,4.7215,4.7203,4.719,4.7178,4.7165,4.7153,4.714,4.7127,4.7115,4.7102,4.709,4.7077,4.7065,4.7052,\
+4.704,4.7027,4.7014,4.7002,4.6989,4.6977,4.6964,4.6952,4.6939,4.6926,4.6914,4.6901,4.6889,4.6876,4.6864,4.6851,4.6839,\
+4.6826,4.6813,4.6801,4.6788,4.6776,4.6763,4.6751,4.6738,4.6725,4.6713,4.67,4.6688,4.6675,4.6663,4.665,4.6638,4.6625,\
+4.6612,4.66,4.6587,4.6575,4.6562,4.655,4.6537,4.6524,4.6512,4.6499,4.6487,4.6474,4.6462,4.6449,4.6437,4.6424,4.6411,\
+4.6399,4.6386,4.6374,4.6364,4.6364,4.596,4.4343,3.9899,5.7273,5.9697,7.7072,10.9577,16.7717,18.4817,21.5892,24.2871,\
+25.4848,25.5657,25.3232,24.8788,24.5152,24.0707,23.6667,22.9838,22.4949,22.1981,21.9871,21.202,20.555,21.3924,22.7156,\
+25.8357,25.8523,25.2424,24.9454,25.2484,26.6162,27.7887,28.5556,27.9711,21.0061,15.8723,14.6566,15.4791,16.3365,17.5901,\
+19.5455,19.9495,20.413,21.202,21.5623,22.1369,21.3086,20.6768,20.6286,21.2828,20.6768,19.0625,17.5778,17,16.3535,15.5306,\
+14.956,13.8964,10.9726,9.404,8.2144,6.6294,3.6726,3.1414,4.3282,7.8196,9.382,10.6582,11.1521,11.4242,10.8299,10.4114,\
+12.506,14.7329,16.095,20.1776,22.214,23.5455,24.2522,25.0289,25.6061,26.2994,27.4148,28.3131,29.2355,29.2828,29.2828,\
+29.5253,29.8081,29.7273,29.6869,29.6465,29.6307,30.6903,32.1538,33.8016,35.303,35.6152,35.907,35.9091,35.8528,34.47,\
+32.21,28.4268,25.837,24.3125,22.4064,20.7999,18.6756,11.3115,4.2378,1.6402,1.6869,1.7677,1.9697,1.7677,1.7677,1.8154,\
+1.8485,1.9697,2.4485,2.4112,2.2525,2.4351,2.7374,2.7374,2.6162,2.899,3.0202,3.6263,3.8251,3.3434,3.2222,3.2524,3.3838,\
+3.1414,3.1414,3.652,3.5051,3.4242,3.3838,3.4646,4.4243,5.9697,4.4747,4.2154,3.9899,3.8687,4.1515,4.1515,3.9495,3.8283,\
+3.8687,4.0303,4.1111,4.1111,4.3939,4.4747,4.5152,4.5152,4.5132,4.4747,4.7172,4.8384,5.202,5.202,5.206,5.4444,5.404,5.404,\
+5.6461,5.7677,5.7677,5.6061,5.4848,5.5657,5.7677,5.4848,5.5253,5.8081,6.0593,7.4242,7.101,7.5721,7.267,8.2995,6.899,6.4141,\
+6.4949,8.6454,8.4567,6.7778,7.7475,7.7521,8.5288,9.2828,8.7664,8.1917,7.7787,6.5758,9.0272,9.5253,8.9596,8.1653,8.7804,\
+7.9177,9.1212,9.6653,9.2424,8.4069,7.6706,7.5051,7.5051,8.1919,8.2323,8.1919,8.3939,7.7475,7.8559,8.1919,8.1164,8.5746,\
+6.899,5.9537,5.2012,5.1616,5.1616,4.8384,4.7969,4.7957,4.7944,4.7932,4.7919,4.7906,4.7894,4.7881,4.7869,4.7856,4.7844,\
+4.7831,4.7818,4.7806,4.7793,4.7781,4.7768,4.7756,4.7743,4.7731,4.7718,4.7705,4.7693,4.768,4.7668,4.7655,4.7643,4.763,\
+4.7617,4.7605,4.7592,4.758,4.7567,4.7555,4.7542,4.753,4.7517,4.7504,4.7492,4.7479,4.7467,4.7454,4.7442,4.7429,4.7416,\
+4.7404,4.7391,4.7379,4.7366,4.7354,4.7341,4.7328,4.7316,4.7303,4.7291,4.7278,4.7266"
+    
 
+    ]
 
-def build_pvgis_url(lat, lon, angle, aspect,libelle, startyear, endyear, MaxPower=1.00, tech='crystSi', db='PVGIS-SARAH3'):
+def build_pvgis_url(lat, lon, angle, aspect,libelle, startyear, endyear, TrackerType, horizonType ,  MaxPower=1.00, tech='crystSi', db='PVGIS-SARAH3'):
     base_url = "https://re.jrc.ec.europa.eu/api/v5_3/seriescalc"
     params = {
         "lat": lat,
@@ -34,15 +62,22 @@ def build_pvgis_url(lat, lon, angle, aspect,libelle, startyear, endyear, MaxPowe
         "startyear": startyear,
         "endyear": endyear,
         "mountingplace": "free",
-        "trackingtype": 0,              #Tracker 2 axe
+        "trackingtype": TrackerType,              #0= fixe   2 2 axes    3 axe vertical qui tourne      5 axe incliné qui tourne 
         "pvcalculation": 1,
         "pvtechchoice": tech,
         "peakpower": MaxPower,
-        "loss": 14
-    }
+        "loss": 14,
+        "select_database_hourly":"PVGIS-SARAH3",
 
+        
+    }
+    if horizonType != 0 :
+        params["userhorizon"] = datahorizonType[horizonType]
+
+        
     url = base_url + "?" + urllib.parse.urlencode(params)
-    filename = f"data_{angle}deg_{aspect}deg_{startyear}_{endyear}_PMax{MaxPower:.2f}.csv"
+
+    filename = f"data_{angle}deg_{aspect}deg_{startyear}_{endyear}_PMax{MaxPower:.2f}_tracking{TrackerType}_hor{horizonType}.csv"
     return url, filename
 
 
@@ -229,75 +264,87 @@ def ajouter_graphique_excel(fichier_excel, df_resultat):
 # === PARAMÈTRES MULTIPLES ===
 import pandas as pd
 
-# Définition des scénarios    
+# Définition des scénarios
+ # tracking    0= fixe   2 2 axes    3 axe vertical qui tourne      5 axe incliné qui tourne
+ # horizonType 0 = use default location   autre indice dans la table des profils d'horizon
+ 
 scenarios = [
+            [     
+        {"libelleScenario": "1xTracker2axes", "investissement": 120+80+45+100 ,"conso_maison_W":1 },
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 2 , "horizonType": 1 , "libelle": "tracker"},
+    ],
+            
     [         
         {"libelleScenario": "UnPanneau_optimal", "investissement": 120+ 80+126 ,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1 , "libelle": "optimal"},
     ],
 
     [  
         {"libelleScenario": "1xBalcon_72", "investissement": 120+80+126 ,"conso_maison_W":100 },
-        {"angle": 72, "aspect": -13.2, "MaxPower": 0.5, "libelle": "balcon 72"},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1 , "libelle": "balcon 72"},
     ],
-        [     
-        {"libelleScenario": "1xBalcon_72_eauseul", "investissement": 120+80+45 ,"conso_maison_W":0 },
-        {"angle": 72, "aspect": -13.2, "MaxPower": 0.5, "libelle": "balcon 72"},
-    ],
+
 
     [  
         {"libelleScenario": "2xToiture_estouest", "investissement": 120+80+80+190 ,"conso_maison_W":100},
-        {"angle": 23, "aspect": -103.2, "MaxPower": 0.5, "libelle": "toitest"},
-        {"angle": 23, "aspect": 76.8, "MaxPower": 0.5, "libelle": "toitwest"},
+        {"angle": 23, "aspect": -103.2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "toitest"},
+        {"angle": 23, "aspect": 76.8, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "toitwest"},
     ],
     [  
         {"libelleScenario": "2xToiture_ouest", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 23, "aspect": 76.8, "MaxPower": 0.5, "libelle": "ouest"},
-        {"angle": 23, "aspect": 76.8, "MaxPower": 0.5, "libelle": "ouest"},
+        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
+        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
     ],
 
     [  
+        {"libelleScenario": "2xToiture_Estouest", "investissement": 120+80+80+190,"conso_maison_W":100},
+        {"angle": 23, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
+        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
+    ],
+
+
+    [  
         {"libelleScenario": "2xBalcon_72", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 72, "aspect": -13.2, "MaxPower": 0.5, "libelle": "balcon 72"},
-        {"angle": 72, "aspect": -13.2, "MaxPower": 0.5, "libelle": "balcon 72"},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
     ],
     [  
-        {"libelleScenario": "2xGarage_Ouest", "investissement": 120+80+80+190},
-        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "libelle": "garage ouest"},
-        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "libelle": "garage ouest"},
+        {"libelleScenario": "2xGarage_Ouest", "investissement": 120+80+80+190,"conso_maison_W":100},
+        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "garage ouest"},
+        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "garage ouest"},
     ],
     [  # mix optimal + balcon 
         {"libelleScenario": "2xMix_optimal_balcon72", "investissement": 120+80+80+126+126,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
-        {"angle": 72, "aspect": -13.2, "MaxPower": 0.5, "libelle": "balcon 72"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
     ],
     [  # optimal x2  
         {"libelleScenario": "2xOptimal", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
     ],
 
         [  # optimal x3
         {"libelleScenario": "3xoptimal", "investissement": 120+80+80+80+190+125,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
     ],
 
         [  #  mix 
         {"libelleScenario": "1xOptimal_x2balcon72", "investissement": 120+80+80+190 +80+125,"conso_maison_W":100},
-        {"angle": 72, "aspect": -13.5, "MaxPower": 0.5, "libelle": "balcon 72"},
-        {"angle": 72, "aspect": -13.5, "MaxPower": 0.5, "libelle": "balcon 72"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "libelle": "optimal"},
+        {"angle": 72, "aspect": -13.5, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
+        {"angle": 72, "aspect": -13.5, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
  
     ],
     
-         [  # optimal 
+         [  # optimal pas d'ombre
         {"libelleScenario": "4xOptimal", "investissement": 120+80+80+80+80+ 280,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "libelle": "optimal"},
-         {"angle": 37, "aspect": -2, "MaxPower": 0.52, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+         {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
        
     ],   
 ]
