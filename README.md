@@ -39,7 +39,8 @@ ex:
 * le calcul genere des fichiers excel avec les données journalieres pour chaque panneau et un cumul globlal de tous les panneaux ( plus un graphique journalier pour chaque mois).
 * un fichier resultats_scenarios.xlsx est generé avec le resumé des calculs et ammortissements avec un lien vers chaque fichier excel des données+graphiques.
 
-![image](https://github.com/user-attachments/assets/81559d2b-f91d-4f10-b877-833c89af2df1)
+![image](https://github.com/user-attachments/assets/0e66fc52-4cb5-41b3-a0c5-251aa8ea181c)
+
 
 on retrouve:
  * scenario	investissement
@@ -56,9 +57,21 @@ on retrouve:
  * Depense          (investissement + manque) 
  * Gain_Sur_depense
  * lien_excel
-
+ * 
  Pour chaque scenario le lien excel pointe vers le fichier datas et graphiques:
 ![image](https://github.com/user-attachments/assets/32c4af2c-8623-498b-9990-a247e0c09bab)
+
+
+Des onglets supplementaires resumes:
+  - les parametres scenarios.
+  -    
+    ![image](https://github.com/user-attachments/assets/49bb57f0-c3a2-422e-91ac-1f77757ad5ba)
+
+  - les diagrammes solaire avec les masques de hauteur d'horizon
+   ![image](https://github.com/user-attachments/assets/978bf3ad-2aef-4475-af41-dc7414103b84)
+
+
+
 
   
     
