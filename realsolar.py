@@ -1,3 +1,34 @@
+import importlib
+import subprocess
+import sys
+
+# Liste des bibliothèques nécessaires
+required_libs = [
+    "pandas",
+    "openpyxl",
+    "os",
+    "calendar",
+    "urllib.parse",
+    "requests",
+    "urllib3",
+    "datetime",
+    "hashlib",
+    "time"
+]
+
+# Fonction pour vérifier et installer les bibliothèques manquantes
+def check_and_install(package_name):
+    try:
+        importlib.import_module(package_name.split('.')[0])
+    except ImportError:
+        print(f"Installation de {package_name}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+
+# Vérifie toutes les dépendances
+for lib in required_libs:
+    check_and_install(lib)
+
+
 import pandas as pd
 import os
 from openpyxl import load_workbook
@@ -7,8 +38,19 @@ import urllib.parse
 import requests
 import urllib3
 from datetime import datetime
+import hashlib
+import time
+from openpyxl.styles import Font, PatternFill, Border, Side
+from openpyxl.comments import Comment
+from openpyxl.utils import get_column_letter
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+############################################################################################"
+#USER DATA
+
+doaall=0;   # mettre a un pour ignorer les fichiers existants et tout refaire
 
 # Variables globales
 resultats = []
@@ -19,8 +61,11 @@ prix_kw = 0.2016  # €/kWh
 date_departcumul = pd.Timestamp("2020-01-01")
 conso_chauffeau_journalière = 2.2  # kWh
 
-#attention si les data de l'horizon change il faut efface les fichiers intermediare data_xxx  pour refaire la demande a pvgis
-## un profile par lieu de panneau ( hauteur des masques de 0 (nord) a 360 degree ) 
+conso_maison_W= 100
+# Définition des masks d'horizon
+
+#attention si les data de l'horizon change il faut efface les fichiers intermediare ( faire doaall=1)  pour refaire la demande a pvgis
+## definir un profile par lieu de panneau ( hauteur des masques de 0 (nord) a 360 degree ) 
 datahorizonType=[
     "" ,
  "4.7266,4.7253,4.7241,4.7228,4.7215,4.7203,4.719,4.7178,4.7165,4.7153,4.714,4.7127,4.7115,4.7102,4.709,4.7077,4.7065,4.7052,\
@@ -46,10 +91,108 @@ datahorizonType=[
 4.7617,4.7605,4.7592,4.758,4.7567,4.7555,4.7542,4.753,4.7517,4.7504,4.7492,4.7479,4.7467,4.7454,4.7442,4.7429,4.7416,\
 4.7404,4.7391,4.7379,4.7366,4.7354,4.7341,4.7328,4.7316,4.7303,4.7291,4.7278,4.7266"
     
-
     ]
 
-def build_pvgis_url(lat, lon, angle, aspect,libelle, startyear, endyear, TrackerType, horizonType ,  MaxPower=1.00, tech='crystSi', db='PVGIS-SARAH3'):
+
+# Définition des scénarios de pose des panneaux
+
+#note:
+ # pas d'espace dans les libellé
+ # tracking    0= fixe   2 2 axes    3 axe vertical qui tourne      5 axe incliné qui tourne
+ # horizonType 0 = use default location   autre indice dans la table des profils d'horizon
+ 
+scenarios = [
+
+    [  
+        {"libelleScenario": "2x_Toiture_Ouest_sans_mask", "investissement": 120+80+80+190,"conso_maison_W":conso_maison_W},
+        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
+        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
+    ],
+
+    [  
+        {"libelleScenario": "2x_Toiture_Est_ouest_sans_mask", "investissement": 120+80+80+190,"conso_maison_W":conso_maison_W},
+        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
+        {"angle": 23, "aspect": -(180-72) , "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "est"},
+    ],
+
+    
+            [     
+        {"libelleScenario": "x1_Tracker_2axes_mask_balcon", "investissement": 120+80+45+100 ,"conso_maison_W":conso_maison_W },
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 2 , "horizonType": 1 , "libelle": "tracker"},
+    ],
+                        [     
+        {"libelleScenario": "x1_Tracker_2axes_sansmask", "investissement": 120+80+45+100 ,"conso_maison_W":conso_maison_W },
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 2 , "horizonType": 0 , "libelle": "tracker"},
+    ],
+            
+            
+    [         
+        {"libelleScenario": "x1_optimal_sans_mask", "investissement": 120+ 80+126 ,"conso_maison_W":conso_maison_W},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0 , "libelle": "optimal"},
+    ],
+
+    [  
+        {"libelleScenario": "x1_Balcon_angle_72_avec_mask", "investissement": 120+80+126 ,"conso_maison_W":conso_maison_W },
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1 , "libelle": "balcon_72"},
+    ],
+
+
+
+
+    [  
+        {"libelleScenario": "2x_Balcon_angle_72_avec_mask ", "investissement": 120+80+80+190,"conso_maison_W":conso_maison_W},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon_72"},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon_72"},
+    ],
+    [  
+        {"libelleScenario": "2x_Garage_Ouest_sans_mask", "investissement": 120+80+80+190,"conso_maison_W":conso_maison_W},
+        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "garage_ouest"},
+        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "garage_ouest"},
+    ],
+    [  # mix optimal + balcon 
+        {"libelleScenario": "2x_1optimal_1balcon72_avec_mask", "investissement": 120+80+80+126+126,"conso_maison_W":conso_maison_W},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon_72"},
+    ],
+    [  # optimal x2  
+        {"libelleScenario": "2x_Optimal_sans_mask", "investissement": 120+80+80+190,"conso_maison_W":conso_maison_W},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
+    ],
+
+        [  # optimal x3
+        {"libelleScenario": "3x_optimal_sans_mask", "investissement": 120+80+80+80+190+125,"conso_maison_W":conso_maison_W},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+    ],
+
+        [  #  mix 
+        {"libelleScenario": "1x_Optimal_x2balcon72_avec_mask", "investissement": 120+80+80+190 +80+125,"conso_maison_W":conso_maison_W},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon_72"},
+        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon_72"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+ 
+    ],
+    
+         [  # optimal pas d'ombre
+        {"libelleScenario": "4xOptimal_sans_mask", "investissement": 120+80+80+80+80+ 280,"conso_maison_W":conso_maison_W},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+         {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+       
+    ],   
+]
+
+#END USER DATA
+############################################################################################"
+
+
+
+
+
+def build_pvgis_url(i,lat, lon, angle, aspect,libelle, startyear, endyear, TrackerType, horizonType ,  MaxPower=1.00, tech='crystSi', db='PVGIS-SARAH3'):
     base_url = "https://re.jrc.ec.europa.eu/api/v5_3/seriescalc"
     params = {
         "lat": lat,
@@ -77,22 +220,25 @@ def build_pvgis_url(lat, lon, angle, aspect,libelle, startyear, endyear, Tracker
         
     url = base_url + "?" + urllib.parse.urlencode(params)
 
-    filename = f"data_{angle}deg_{aspect}deg_{startyear}_{endyear}_PMax{MaxPower:.2f}_tracking{TrackerType}_hor{horizonType}.csv"
+    filename = f"idata{i}_{angle}deg_{aspect}deg_{startyear}_{endyear}_PMax{MaxPower:.2f}_tracking{TrackerType}_hor{horizonType}.csv"
     return url, filename
 
 
 def telecharger_csv(url, filename):
-    if not os.path.exists(filename):
+    if not os.path.exists(filename)  or doaall==1:
         print(f"Téléchargement depuis : {url}")
         response = requests.get(url, verify=False)
         if response.ok:
             with open(filename, 'wb') as f:
                 f.write(response.content)
             print(f"✅ Fichier enregistré sous : {filename}")
+            return 1
         else:
             print(f"❌ Erreur {response.status_code}")
+            return 1
     else:
         print(f"✔️ Fichier déjà existant : {filename}")
+        return 0
 
 
 def traitement_csv(filename, maxpower):
@@ -122,9 +268,10 @@ def traitement_csv(filename, maxpower):
 
 
 def traitement_cumul(filename,conso_maison_W):
+
     df = pd.read_excel(filename)
     conso_maison_kW = conso_maison_W / 1000
-
+        
     df['date'] = pd.to_datetime(df['datetime']).dt.date
    
     df['p_dispo'] = 0.0
@@ -261,106 +408,218 @@ def ajouter_graphique_excel(fichier_excel, df_resultat):
 
 
 
-# === PARAMÈTRES MULTIPLES ===
-import pandas as pd
-
-# Définition des scénarios
- # tracking    0= fixe   2 2 axes    3 axe vertical qui tourne      5 axe incliné qui tourne
- # horizonType 0 = use default location   autre indice dans la table des profils d'horizon
- 
-scenarios = [
-            [     
-        {"libelleScenario": "1xTracker2axes", "investissement": 120+80+45+100 ,"conso_maison_W":1 },
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 2 , "horizonType": 1 , "libelle": "tracker"},
-    ],
-            
-    [         
-        {"libelleScenario": "UnPanneau_optimal", "investissement": 120+ 80+126 ,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1 , "libelle": "optimal"},
-    ],
-
-    [  
-        {"libelleScenario": "1xBalcon_72", "investissement": 120+80+126 ,"conso_maison_W":100 },
-        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1 , "libelle": "balcon 72"},
-    ],
-
-
-    [  
-        {"libelleScenario": "2xToiture_estouest", "investissement": 120+80+80+190 ,"conso_maison_W":100},
-        {"angle": 23, "aspect": -103.2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "toitest"},
-        {"angle": 23, "aspect": 76.8, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "toitwest"},
-    ],
-    [  
-        {"libelleScenario": "2xToiture_ouest", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
-        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
-    ],
-
-    [  
-        {"libelleScenario": "2xToiture_Estouest", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 23, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
-        {"angle": 23, "aspect": 72, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "ouest"},
-    ],
-
-
-    [  
-        {"libelleScenario": "2xBalcon_72", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
-        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
-    ],
-    [  
-        {"libelleScenario": "2xGarage_Ouest", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "garage ouest"},
-        {"angle": 23, "aspect": 47, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "garage ouest"},
-    ],
-    [  # mix optimal + balcon 
-        {"libelleScenario": "2xMix_optimal_balcon72", "investissement": 120+80+80+126+126,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
-        {"angle": 72, "aspect": -18, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
-    ],
-    [  # optimal x2  
-        {"libelleScenario": "2xOptimal", "investissement": 120+80+80+190,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "optimal"},
-    ],
-
-        [  # optimal x3
-        {"libelleScenario": "3xoptimal", "investissement": 120+80+80+80+190+125,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
-    ],
-
-        [  #  mix 
-        {"libelleScenario": "1xOptimal_x2balcon72", "investissement": 120+80+80+190 +80+125,"conso_maison_W":100},
-        {"angle": 72, "aspect": -13.5, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
-        {"angle": 72, "aspect": -13.5, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 1, "libelle": "balcon 72"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.5, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
- 
-    ],
-    
-         [  # optimal pas d'ombre
-        {"libelleScenario": "4xOptimal", "investissement": 120+80+80+80+80+ 280,"conso_maison_W":100},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
-        {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
-         {"angle": 37, "aspect": -2, "MaxPower": 0.52, "TrackerType": 0 , "horizonType": 0, "libelle": "optimal"},
+def format_excel(excelfilename):
        
-    ],   
-]
+    # Ouvre le fichier pour modifications avec openpyxl
+    wb = load_workbook(excelfilename)
+    ws = wb.active
+
+    # 1. Ajoute une ligne de filtrage (auto-filter)
+    ws.auto_filter.ref = ws.dimensions  # Applique le filtre sur toute la plage de données
+
+    # 2. Ajuste la largeur des colonnes
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column  # Numéro de colonne
+        column_letter = get_column_letter(column)
+        for cell in col:
+            try:
+                cell_value = str(cell.value)
+                if len(cell_value) > max_length:
+                    max_length = len(cell_value)
+            except:
+                pass
+        ws.column_dimensions[column_letter].width = max_length + 2  # +2 pour un petit confort visuel
+
+    # 3. Souligne en bleu la dernière colonne si c'est un lien
+    last_col_idx = ws.max_column
+    for row in range(2, ws.max_row + 1):  # Ignore l'entête
+        cell = ws.cell(row=row, column=last_col_idx)
+        if isinstance(cell.value, str) and cell.value.startswith("http"):
+            cell.font = Font(color="0000FF", underline="single")
+
+    # Sauvegarde finale
+    wb.save("resultats_scenarios.xlsx")
+
+
+    # Chargement du fichier
+    wb = load_workbook("resultats_scenarios.xlsx")
+
+    # Ajout d'une nouvelle feuille
+    if "Details_Scenarios" in wb.sheetnames:
+        ws = wb["Details_Scenarios"]
+        wb.remove(ws)  # Nettoyage si déjà présent
+    ws = wb.create_sheet("Details_Scenarios")
+
+    # Style pour l'entête
+    bold_font = Font(bold=True)
+    header_fill = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+    border = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin")
+    )
+
+    row = 1
+    for scenario in scenarios:
+        meta = scenario[0]
+        panneaux = scenario[1:]
+
+        # Titre du scénario
+        ws.cell(row=row, column=1, value=f"Scénario : {meta['libelleScenario']}")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=12)
+        row += 1
+
+        # Infos globales
+        ws.cell(row=row, column=1, value="Investissement (€)")
+        ws.cell(row=row, column=2, value=meta["investissement"])
+        ws.cell(row=row, column=3, value="Conso Maison (W)")
+        ws.cell(row=row, column=4, value=meta["conso_maison_W"])
+        for col in range(1, 5):
+            ws.cell(row=row, column=col).font = bold_font
+        row += 2
+
+        # En-têtes panneaux
+        headers = ["Libellé", "Angle", "Aspect", "MaxPower", "TrackerType", "HorizonType"]
+        for col, h in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=h)
+            cell.font = bold_font
+            cell.fill = header_fill
+            cell.border = border
+        row += 1
+
+        # Infos par panneau
+        for p in panneaux:
+            ws.cell(row=row, column=1, value=p["libelle"])
+            ws.cell(row=row, column=2, value=p["angle"])
+            ws.cell(row=row, column=3, value=p["aspect"])
+            ws.cell(row=row, column=4, value=p["MaxPower"])
+            ws.cell(row=row, column=5, value=p["TrackerType"])
+            ws.cell(row=row, column=6, value=p["horizonType"])
+            for col in range(1, 7):
+                ws.cell(row=row, column=col).border = border
+            row += 1
+
+        row += 2  # Espace entre scénarios
+
+ 
+#################
+
+  
+    ws_main = wb.worksheets[0]  # La première feuille (où sont listés les scénarios)
+
+    # Création d'un dict pour accès rapide aux infos de scénario
+    scenario_map = {}
+    for scenario in scenarios:
+        meta = scenario[0]
+        panneaux = scenario[1:]
+        texte =  f"Conso maison : {meta['conso_maison_W']} W"
+
+        # Formatage des panneaux pour éviter trop de texte
+        for i, p in enumerate(panneaux, 1):
+            texte += f"\n• {p['libelle']}: {p['MaxPower']} kW, Angle {p['angle']}°, Aspect {p['aspect']}°, Track {p['TrackerType']}, Horizon {p['horizonType']} "
+        
+        scenario_map[meta['libelleScenario']] = texte
+
+    # Appliquer les commentaires aux noms trouvés dans la colonne A
+    for row in ws_main.iter_rows(min_row=2, min_col=1, max_col=1):
+        cell = row[0]
+        nom = str(cell.value)
+        if nom in scenario_map:
+            comment_text = scenario_map[nom]
+            # Créer un commentaire
+            comment = Comment(comment_text, "AutoGen")
+            
+            # Ajuster le commentaire (largeur et hauteur)
+            comment.width = 300  # Largeur du commentaire (en pixels)
+            comment.height = 150  # Hauteur du commentaire (en pixels)
+            
+            # Ajouter le commentaire à la cellule
+            cell.comment = comment
+
+  
+    # Fonction pour convertir un numéro de colonne en lettre
+    def column_index_to_letter(index):
+        """Convertit un index de colonne (numérique) en lettre correspondante (ex: 1 -> 'A', 2 -> 'B')"""
+        letter = ''
+        while index > 0:
+            index, remainder = divmod(index - 1, 26)
+            letter = chr(65 + remainder) + letter
+        return letter
+
+
+
+    #wb = load_workbook("resultats_scenarios.xlsx")
+    ws_main = wb.worksheets[0]  # La première feuille (où sont listés les scénarios)
+
+    # Insertion de lignes en haut (avant la ligne 1)
+    ws_main.insert_rows(1, 7)  # Insère 7 lignes au-dessus de la première ligne existante
+
+    # Style pour les titres
+    bold_font = Font(bold=True)
+
+    # Ajout des données dans les nouvelles lignes
+    ws_main.cell(row=1, column=1, value="Latitude")
+    ws_main.cell(row=1, column=2, value=lat).font = bold_font
+
+    ws_main.cell(row=2, column=1, value="Longitude")
+    ws_main.cell(row=2, column=2, value=lon).font = bold_font
+
+    ws_main.cell(row=3, column=1, value="Période")
+    ws_main.cell(row=3, column=2, value=f"{startyear} - {endyear}").font = bold_font
+
+    ws_main.cell(row=4, column=1, value="Prix kWh (€)")
+    ws_main.cell(row=4, column=2, value=prix_kw).font = bold_font
+
+    ws_main.cell(row=5, column=1, value="Date de départ cumul")
+    ws_main.cell(row=5, column=2, value=date_departcumul.date()).font = bold_font
+
+    ws_main.cell(row=6, column=1, value="Consommation chauffe-eau journalière (kWh)")
+    ws_main.cell(row=6, column=2, value=conso_chauffeau_journalière).font = bold_font
+
+    ws_main.cell(row=7, column=1, value="Consommation maison(W)")
+    ws_main.cell(row=7, column=2, value=conso_maison_W).font = bold_font
+
+
+
+    # Réappliquer le filtre à la nouvelle ligne 5 (au lieu de 1)
+    last_column_letter = column_index_to_letter(ws_main.max_column)  # Convertir max_column en lettre
+    ws_main.auto_filter.ref = f"A8:{last_column_letter}8"  # Définir la plage du filtre de la ligne 5
+
+    # Sauvegarde du fichier
+    wb.save(excelfilename)
 
 
 
 
 
+def attendre_fermeture_fichier(fichier):
+    while True:
+        try:
+            # On tente d'ouvrir en écriture exclusive
+            with open(fichier, "a"):
+                print(f"✅ Le fichier '{fichier}' est libre. On continue.")
+                break
+        except PermissionError:
+            input(f"❌ Le fichier '{fichier}' est actuellement ouvert.\n👉 Merci de le fermer, puis appuyez sur [Entrée] pour réessayer...")
+        time.sleep(1)
+        
+#-------------------------------------------------------
+#main
 
 
+
+# Exemple d'utilisation
+fichier = "resultats_scenarios.xlsx"
+if os.path.exists(fichier):
+    attendre_fermeture_fichier(fichier)
 
 
 # Traitement de chaque scénario
 for scenario in scenarios:
     meta = scenario[0]
     configs = scenario[1:]
+   
+    atleastone=doaall    #mettre 1 pour clean
 
     print(f"\n▶️ Scénario: {meta['libelleScenario']}")
     for config in configs:
@@ -369,34 +628,56 @@ for scenario in scenarios:
     df_cumul = pd.DataFrame()
     dfs_scenarios = {}
 
+    nompourhash=""
     for i, params in enumerate(configs, 1):
-        url, filename = build_pvgis_url(lat, lon, **params, startyear=startyear, endyear=endyear)
-        telecharger_csv(url, filename)
-
-        
-
-        brut = traitement_csv(filename, params["MaxPower"])
-        brut["datetime"] = pd.to_datetime(brut["datetime"])
-        brut = brut[["datetime", "p"]]
+        url, filename = build_pvgis_url(i,lat, lon, **params, startyear=startyear, endyear=endyear)
+        updated = telecharger_csv(url, filename)
 
         nom_finalbrut = f"energie_brut_{params['libelle']}_{i}_{params['angle']}_{params['aspect']}_{params['MaxPower']}.xlsx"
-        brut.to_excel(nom_finalbrut, index=False)
+        nompourhash=nompourhash+nom_finalbrut
+        
+        if updated == 1:
+            atleastone=1
+            # 🔄 Fichier mis à jour → retraitement du CSV
+            brut = traitement_csv(filename, params["MaxPower"])
+            brut["datetime"] = pd.to_datetime(brut["datetime"])
+            brut = brut[["datetime", "p"]]
+            brut.to_excel(nom_finalbrut,index=False)
 
+        else:
+            # 📂 Fichier déjà présent → relire Excel existant
+            print("relecture",nom_finalbrut)
+            brut = pd.read_excel(nom_finalbrut)
+  
+           # brut = brut[["datetime", "p"]]
+             
         brut.set_index('datetime', inplace=True)
         dfs_scenarios[f"scenario_{i}"] = brut.copy()
-
+        # ⚙️ Ajouter les puissances au cumul
         df_cumul = brut if df_cumul.empty else df_cumul.add(brut, fill_value=0)
 
+    # Ajouter chaque scénario en colonne individuelle
     for name, df in dfs_scenarios.items():
         df_cumul[f"{name}"] = df["p"]
 
-    nom_final = f"energie_cumulee_scenarios_{meta['libelleScenario']}.xlsx"
-    df_cumul.to_excel(nom_final)
+    # Export du fichier cumulatif brut
+    thach= hashlib.sha256(nompourhash.encode()).hexdigest()[:8]    
+    nom_scenario = f"energie_scenarios_{meta['libelleScenario']}_{thach}.xlsx"
+    nom_final = f"energie_cumulee_scenarios_{meta['libelleScenario']}_{thach}.xlsx"
 
-    df_cumulfin = traitement_cumul(nom_final ,  meta['conso_maison_W'] )
-    df_cumulfin.to_excel(nom_final)
-    ajouter_graphique_excel(nom_final, df_cumulfin)
+    if atleastone  or  not os.path.exists(nom_scenario) :
+        print("regenere cumul pour ce scenario:",nom_scenario)
+        df_cumul.to_excel(nom_scenario)
 
+    # Traitement final
+        df_cumulfin = traitement_cumul(nom_scenario, meta['conso_maison_W'])
+        df_cumulfin.to_excel(nom_final)
+        ajouter_graphique_excel(nom_final, df_cumulfin)
+    
+    else:
+        df_cumulfin = pd.read_excel(nom_final)
+
+   
     last_row = df_cumulfin[["energie_perdue"	,"manque",	"energie_recuperee",  "cumul_gain (€)", "cumul_perte (€)" ,  "cumul_manque (€)" ]].iloc[-1]
     gain = last_row["cumul_gain (€)"]
     perte = last_row["cumul_perte (€)"]
@@ -430,6 +711,9 @@ for scenario in scenarios:
         "lien_excel": f'=HYPERLINK("{nom_final}", "Ouvrir Excel")'
     })
 
+
+       
+
 # Résumé final
 print("\n📊 Résumé des scénarios :\n")
 for res in resultats:
@@ -444,6 +728,31 @@ for res in resultats:
 
 # Export final des résultats
 df_resultats = pd.DataFrame(resultats)
-df_resultats.to_excel("resultats_scenarios.xlsx", index=False)
+
+# 🔽 Appliquer la règle d’arrondi
+
+def format_number(val):
+        try:
+            if isinstance(val, (int, float)):
+                if abs(val) < 100:
+                    return round(val,2)
+                else:
+                    return round(val)
+            return val
+        except:
+            return val
+
+df_resultats = df_resultats.applymap(format_number)
+
+# Sauvegarde initiale avec pandas
+saveto="resultats_scenarios.xlsx"
+df_resultats.to_excel(saveto, index=False)
+format_excel(saveto)
+
 print("✅ Résumé global exporté dans 'resultats_scenarios.xlsx'")
 
+if os.path.exists(fichier):
+    print(f"📂 Ouverture de {fichier}...")
+    os.startfile(fichier)
+
+    
